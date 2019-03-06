@@ -1,8 +1,8 @@
 # Licode-Android
 
-###### A simple demo for licode
+### A simple demo for licode
 
-###Thanks [AppRTCDemo](https://github.com/njovy/AppRTCDemo)
+### Thanks [AppRTCDemo](https://github.com/njovy/AppRTCDemo)
 
 
 
