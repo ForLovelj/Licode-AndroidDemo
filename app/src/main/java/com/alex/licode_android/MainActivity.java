@@ -148,6 +148,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected void convert(BaseViewHolder helper, View item) {
+            helper.setIsRecyclable(false);
             FrameLayout frameLayout = helper.getView(R.id.container);
             ViewGroup parent = (ViewGroup) item.getParent();
             if (parent != null) {
