@@ -11,7 +11,7 @@ import org.webrtc.PeerConnection;
 import org.webrtc.SdpObserver;
 import org.webrtc.SessionDescription;
 import org.webrtc.SurfaceViewRenderer;
-import org.webrtc.VideoRenderer;
+import org.webrtc.VideoSink;
 import org.webrtc.VideoTrack;
 
 import java.util.List;
@@ -26,23 +26,23 @@ import java.util.concurrent.Executors;
 public class StreamDescription extends IStreamDescription {
 
 
-    public static final String TAG = "StreamDescription";
+    public static final String            TAG = "StreamDescription";
+    private              PeerConnection   mPc;
+    private              AudioTrack       mAudioTrack;
+    private              VideoTrack       mVideoTrack;
+    private              SDPObserver      mSdpObserver;
+    private              MediaConstraints mMediaConstraints;
+    private ExecutorService               executor;
+    private StreamDesState                mStreamDesState;
+    private SessionDescription            localSdp;
+    private PeerConnectionEvents          mEvents;
+    private SurfaceViewRenderer           mLocalRender;
+    private SurfaceViewRenderer           mRemoteRender;
+    private List<VideoSink>               mRemoteSinks;
 
-    private              PeerConnection       mPc;
-    private              AudioTrack           mAudioTrack;
-    private              VideoTrack           mVideoTrack;
-    private              SDPObserver          mSdpObserver;
-    private              MediaConstraints     mMediaConstraints;
-    private              ExecutorService      executor = Executors.newSingleThreadExecutor();
-    private              StreamDesState       mStreamDesState;
-    private              SessionDescription   localSdp;
-    private              PeerConnectionEvents mEvents;
-    private     List<VideoRenderer.Callbacks> mRemoteSinks;
-    private SurfaceViewRenderer mLocalRender;
-    private SurfaceViewRenderer mRemoteRender;
-
-    public static StreamDescription parseJson(JSONObject streamObj, boolean isLocal) {
-        String cube = null;
+    public static StreamDescription parseJson(JSONObject streamObj,boolean isLocal) {
+        String cubeId = null;
+        String conferenceId = null;
 
         boolean audio = streamObj.optBoolean("audio",true);
         boolean video = streamObj.optBoolean("video",true);
@@ -52,35 +52,38 @@ public class StreamDescription extends IStreamDescription {
         String screen = streamObj.optString("screen");
         JSONObject attr = streamObj.optJSONObject("attributes");
         if (attr != null) {
-            cube = attr.optString("cube");
+            cubeId = attr.optString("cubeId");
+            conferenceId = attr.optString("conferenceId");
         }
 
-        return new StreamDescription(id, data, video, audio, screen, attr,label, cube,isLocal);
+        return new StreamDescription(id, data, video, audio, screen, attr,label, cubeId,conferenceId,isLocal);
     }
 
-    public StreamDescription(long id, boolean data, boolean video, boolean audio, String screen, JSONObject attr, String label, String cube, boolean isLocal) {
+    public StreamDescription(long id, boolean data, boolean video, boolean audio, String screen, JSONObject attr, String label, String cubeId,String conferenceId, boolean isLocal) {
         mId = id;
         mData = data;
         mVideo = video;
         mAudio = audio;
         mScreen = screen;
         mLabel = label;
-        mCube = cube;
+//        mCubeId = cubeId;
+//        mConferenceId = conferenceId;
         this.isLocal = isLocal;
         if (attr != null) {
             mAttributes = attr;
         }
     }
 
-    public StreamDescription(long id,boolean isLocal) {
-        this(id, true, true, true, "", null, "", "",isLocal);
-    }
 
     public void initPC(PeerConnection pc) {
+        if (mPc != null) {
+            return;
+        }
+        executor = Executors.newSingleThreadExecutor();
         mPc = pc;
     }
 
-    public void initEvent(List<VideoRenderer.Callbacks> remoteSinks, MediaConstraints mediaConstraints, StreamDesState streamDesState, PeerConnectionEvents events) {
+    public void initEvent(List<VideoSink> remoteSinks,MediaConstraints mediaConstraints, StreamDesState streamDesState, PeerConnectionEvents events) {
         mRemoteSinks = remoteSinks;
         mSdpObserver = new SDPObserver();
         mMediaConstraints = mediaConstraints;
@@ -89,40 +92,73 @@ public class StreamDescription extends IStreamDescription {
         if (mStreamDesState != null) {
             mStreamDesState.onStreamDesInit();
         }
+        createOffer();
     }
 
     @Override
     public void createOffer() {
         Log.d(TAG, "createOffer: ");
-        executor.execute(() -> getPc().createOffer(mSdpObserver, mMediaConstraints));
+        localSdp = null;
+        getPc().createOffer(mSdpObserver, mMediaConstraints);
+        //        executor.execute(() -> getPc().createOffer(mSdpObserver, mMediaConstraints));
     }
 
     @Override
     public void createAnswer() {
-        executor.execute(() -> getPc().createAnswer(mSdpObserver, mMediaConstraints));
+        getPc().createAnswer(mSdpObserver, mMediaConstraints);
+        //        executor.execute(() -> getPc().createAnswer(mSdpObserver, mMediaConstraints));
     }
 
     @Override
     public void setRemoteDescription(String sdp) {
         Log.d(TAG, "setRemoteDescription: ");
-        executor.execute(() -> {
-            SessionDescription remoteSdp = new SessionDescription(SessionDescription.Type.ANSWER, sdp);
-            getPc().setRemoteDescription(mSdpObserver,remoteSdp);
-        });
+        SessionDescription remoteSdp = new SessionDescription(SessionDescription.Type.ANSWER, sdp);
+        getPc().setRemoteDescription(mSdpObserver,remoteSdp);
+        //        executor.execute(() -> {
+        //            SessionDescription remoteSdp = new SessionDescription(SessionDescription.Type.ANSWER, sdp);
+        //            getPc().setRemoteDescription(mSdpObserver,remoteSdp);
+        //        });
     }
 
     public void setLocalDescription(SessionDescription sdp) {
-        executor.execute(() -> {
-            getPc().setLocalDescription(mSdpObserver,sdp);
-        });
+        getPc().setLocalDescription(mSdpObserver,sdp);
+        //        executor.execute(() -> {
+        //            getPc().setLocalDescription(mSdpObserver,sdp);
+        //        });
+    }
+
+    public void setAudioEnabled(final boolean enable) {
+        if (mAudioTrack != null) {
+            mAudioTrack.setEnabled(enable);
+        }
+        //        executor.execute(() -> {
+        //            if (mAudioTrack != null) {
+        //                mAudioTrack.setEnabled(enable);
+        //            }
+        //        });
+    }
+
+    public void setVideoEnabled(final boolean enable) {
+        if (mVideoTrack != null) {
+            mVideoTrack.setEnabled(enable);
+        }
+        //        executor.execute(() -> {
+        //            if (mVideoTrack != null) {
+        //                mVideoTrack.setEnabled(enable);
+        //            }
+        //        });
     }
 
 
-    public List<VideoRenderer.Callbacks> getRemoteSinks() {
+    public List<VideoSink> getRemoteSinks() {
         return mRemoteSinks;
     }
 
     public void close() {
+        if (executor != null) {
+            executor.shutdown();
+            executor = null;
+        }
         if (mLocalRender != null) {
             mLocalRender.release();
             mLocalRender = null;
@@ -136,36 +172,17 @@ public class StreamDescription extends IStreamDescription {
             mPc = null;
         }
 
+        mAudioTrack = null;
+        mVideoTrack = null;
+        mRemoteSinks = null;
         mSdpObserver = null;
         mEvents = null;
         mStreamDesState = null;
     }
 
-    public void bindView(SurfaceViewRenderer localRender, SurfaceViewRenderer remoteRender) {
+    public void bindView(SurfaceViewRenderer localRender,SurfaceViewRenderer remoteRender) {
         mLocalRender = localRender;
         mRemoteRender = remoteRender;
-    }
-
-    public void setVideoEnabled(final boolean enable) {
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                if (mVideoTrack != null) {
-                    mVideoTrack.setEnabled(enable);
-                }
-            }
-        });
-    }
-
-    public void setAudioEnabled(final boolean enable) {
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                if (mAudioTrack != null) {
-                    mAudioTrack.setEnabled(enable);
-                }
-            }
-        });
     }
 
     @Override
@@ -248,4 +265,13 @@ public class StreamDescription extends IStreamDescription {
         }
         return mPc;
     }
+
+    public boolean isVideoEnable() {
+        return mVideoTrack != null && mVideoTrack.enabled();
+    }
+
+    public boolean isAudioEnable() {
+        return mAudioTrack != null && mAudioTrack.enabled();
+    }
+
 }

@@ -22,7 +22,8 @@ import org.webrtc.SessionDescription;
 import org.webrtc.StatsReport;
 import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoCapturer;
-import org.webrtc.VideoRenderer;
+import org.webrtc.VideoFrame;
+import org.webrtc.VideoSink;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,15 +39,15 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
 
     public static final String                                     TAG          = "LicodeStream";
     private             LicodeSignalingService                     mSocketIoClient;
-    private             Context                                    mContext;
-    private             RTCParameter                               mRTCParameter;
-    private             int                                        mCameraId    = 1;
-    private             ConcurrentHashMap<Long, SurfaceViewRenderer>         mViewMap     = new ConcurrentHashMap<>();
-    private Handler mHandler = new Handler(Looper.getMainLooper());
-    private StreamEvents mEvents;
-    private VideoCapturer mVideoCapturer;
-    private PeerConnectionPool mPCPool;
-    private List<PeerConnection.IceServer> iceServers = new ArrayList<>();
+    private Context                                      mContext;
+    private RTCParameter                                 mRTCParameter;
+    private int                                          mCameraId    = 1;
+    private ConcurrentHashMap<Long, SurfaceViewRenderer> mViewMap     = new ConcurrentHashMap<>();
+    private Handler                                      mHandler = new Handler(Looper.getMainLooper());
+    private StreamEvents                                 mEvents;
+    private VideoCapturer                                mVideoCapturer;
+    private PeerConnectionPool                           mPCPool;
+    private List<PeerConnection.IceServer>               iceServers = new ArrayList<>();
 
     private LicodeStream() {
 
@@ -82,6 +83,7 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
                 config.setCameraId(0);
             }
             mRTCParameter.videoMaxBitrate = config.getVideoMaxBitrate();
+            mRTCParameter.videoMinBitrate = 500;
             mRTCParameter.cameraId = config.getCameraId();
             mCameraId = config.getCameraId();
             int videoW = 0;
@@ -136,8 +138,8 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
         remoteRender.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
         remoteRender.setEnableHardwareScaler(false);
 
-        ProxyRenderer remoteProxyVideoSink = new ProxyRenderer();
-        ProxyRenderer localProxyVideoSink  = new ProxyRenderer();
+        ProxyVideoSink remoteProxyVideoSink = new ProxyVideoSink();
+        ProxyVideoSink localProxyVideoSink  = new ProxyVideoSink();
         localProxyVideoSink.setTarget(localRender);
         remoteProxyVideoSink.setTarget(remoteRender);
 
@@ -149,7 +151,7 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
         StreamDescription streamDes = (StreamDescription)streamDescription;
         streamDes.bindView(localRender,remoteRender);
 
-        List<VideoRenderer.Callbacks> videoSinks = new ArrayList<>();
+        List<VideoSink> videoSinks = new ArrayList<>();
         videoSinks.add(remoteProxyVideoSink);
         mPCPool.createPeerConnection(localProxyVideoSink, videoSinks, mVideoCapturer, iceServers,  streamDes,streamDesState);
     }
@@ -183,25 +185,23 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
         mPCPool.close(streamId);
     }
 
-    private class ProxyRenderer implements VideoRenderer.Callbacks {
-        private VideoRenderer.Callbacks target;
+    private static class ProxyVideoSink implements VideoSink {
+        private VideoSink target;
 
         @Override
-        synchronized public void renderFrame(VideoRenderer.I420Frame frame) {
+        synchronized public void onFrame(VideoFrame frame) {
             if (target == null) {
-                VLog.d("Dropping frame in proxy because target is null.");
-                VideoRenderer.renderFrameDone(frame);
+                Log.d(TAG, "Dropping frame in proxy because target is null.");
                 return;
             }
 
-            target.renderFrame(frame);
+            target.onFrame(frame);
         }
 
-        synchronized public void setTarget(VideoRenderer.Callbacks target) {
+        synchronized public void setTarget(VideoSink target) {
             this.target = target;
         }
     }
-
 
 
     private VideoCapturer createVideoCapturer() {
@@ -283,6 +283,7 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
         VLog.i("sdpOffer: \n" + sdp.description);
         //send offer
         mSocketIoClient.sendOfferSdp(sdp.description,streamDescription);
+        mPCPool.setVideoMaxBitrate(streamDescription.getId(),mRTCParameter.videoMaxBitrate,mRTCParameter.videoMinBitrate);
     }
 
     @Override

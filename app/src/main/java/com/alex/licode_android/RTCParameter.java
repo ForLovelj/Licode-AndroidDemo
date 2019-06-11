@@ -17,6 +17,7 @@ public class RTCParameter {
     public int                            videoHeight;
     public int                            videoFps;
     public int                            videoMaxBitrate;
+    public int                            videoMinBitrate;
     public String                         videoCodec;
     public boolean                        videoCodecHwAcceleration;
     public boolean                        videoFlexfecEnabled;
