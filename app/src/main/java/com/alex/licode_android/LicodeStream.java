@@ -99,7 +99,6 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
         mRTCParameter.audioStartBitrate = config.getAudioMinBitrate();
 
 
-//        mPcClient = createPeerConnectionClient();
         mPCPool = createPeerConnectionPool();
 
         return this;
@@ -282,15 +281,16 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
     public void onLocalDescription(SessionDescription sdp, StreamDescription streamDescription) {
         VLog.i("sdpOffer: \n" + sdp.description);
         //send offer
-        mSocketIoClient.sendOfferSdp(sdp.description,streamDescription);
-        mPCPool.setVideoMaxBitrate(streamDescription.getId(),mRTCParameter.videoMaxBitrate,mRTCParameter.videoMinBitrate);
+        if (streamDescription.isLocal()) {
+            mPCPool.setVideoMaxBitrate(streamDescription.getId(),mRTCParameter.videoMaxBitrate,mRTCParameter.videoMinBitrate);
+        }
     }
 
     @Override
     public void onIceCandidate(IceCandidate candidate,StreamDescription streamDescription) {
         VLog.d("candidate: " + candidate.toString());
-        JSONObject jsonObject = parseIceCandidate(candidate);
-        mSocketIoClient.sendLocalIceCandidate(jsonObject,streamDescription);
+//        JSONObject jsonObject = parseIceCandidate(candidate);
+//        mSocketIoClient.sendLocalIceCandidate(jsonObject,streamDescription);
     }
 
     @Override
@@ -310,8 +310,9 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
     }
 
     @Override
-    public void onIceCompleted() {
+    public void onIceCompleted(StreamDescription streamDescription) {
         VLog.d("onIceCompleted---");
+        mSocketIoClient.sendOfferSdp(streamDescription.getPc().getLocalDescription().description,streamDescription);
     }
 
     @Override
@@ -365,12 +366,7 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                initVideoView(streamDescription, new StreamDescription.StreamDesState() {
-                    @Override
-                    public void onStreamDesInit() {
-                        streamDescription.createOffer();
-                    }
-                });
+                initVideoView(streamDescription, null);
                 View surfaceView = streamDescription.getSurfaceView();
                 VLog.d("surfaceView: "+surfaceView + "   isLocal: "+streamDescription.isLocal());
                 if (mEvents != null) {
@@ -385,12 +381,7 @@ public class LicodeStream implements LicodeSignalingService.SignalingEvents, Pee
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                initVideoView(streamDescription, new StreamDescription.StreamDesState() {
-                    @Override
-                    public void onStreamDesInit() {
-                        streamDescription.createOffer();
-                    }
-                });
+                initVideoView(streamDescription, null);
                 View surfaceView = streamDescription.getSurfaceView();
                 VLog.d("surfaceView: "+surfaceView + "   isLocal: "+streamDescription.isLocal());
                 if (mEvents != null) {

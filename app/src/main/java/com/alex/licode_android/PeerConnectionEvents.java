@@ -133,7 +133,7 @@ public interface PeerConnectionEvents {
     /*
      * ice
      */
-    void onIceCompleted();
+    void onIceCompleted(StreamDescription streamDescription);
 
     /**
      * Callback fired once peer connection is closed.

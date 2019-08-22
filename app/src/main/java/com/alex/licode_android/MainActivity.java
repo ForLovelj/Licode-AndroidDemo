@@ -34,7 +34,6 @@ import retrofit2.Response;
 public class MainActivity extends AppCompatActivity {
 
     private String mTokenServerUrl = "https://192.168.1.82:3004/createToken/";
-//    private String mTokenServerUrl = "https://103.6.222.238:3004/createToken/";
 
     private FrameLayout                                     mLocalContainer;
     private LicodeStream                                    mLicodeStream;

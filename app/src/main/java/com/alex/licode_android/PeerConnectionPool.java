@@ -769,7 +769,7 @@ public class PeerConnectionPool {
         public void onIceGatheringChange(PeerConnection.IceGatheringState newState) {
             Log.d(TAG, "IceGatheringState: " + newState);
             if (PeerConnection.IceGatheringState.COMPLETE == newState) {
-                events.onIceCompleted();
+                events.onIceCompleted(mStreamDescription);
             }
         }
 
